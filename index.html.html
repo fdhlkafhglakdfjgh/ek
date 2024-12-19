@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Распознавание эмоций и усталости</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        #video {
+            width: 100%;
+            max-width: 640px;
+            margin: 20px auto;
+        }
+        .results {
+            margin: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .fatigue-meter {
+            width: 100%;
+            max-width: 300px;
+            margin: 15px auto;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .fatigue-level {
+            height: 20px;
+            background: linear-gradient(90deg, #4CAF50, #FFC107, #F44336);
+            width: 0%;
+            transition: width 0.5s ease-in-out;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Распознавание эмоций и усталости</h1>
+    <button id="startCamera">Включить камеру</button>
+    <video id="video" autoplay playsinline></video>
+
+    <div class="results">
+        <h3>Эмоция: <span id="emotion">-</span></h3>
+        <h3>Степень усталости:</h3>
+        <div class="fatigue-meter">
+            <div class="fatigue-level" id="fatigueLevel"></div>
+        </div>
+        <p id="fatigueText">Уровень усталости: 0%</p>
+    </div>
+
+    <script>
+        async function loadModels() {
+            try {
+                await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models');
+                await faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models');
+                console.log('Модели успешно загружены');
+            } catch (err) {
+                console.error('Ошибка загрузки моделей:', err);
+                alert('Ошибка загрузки моделей');
+            }
+        }
+
+        document.getElementById('startCamera').addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                console.log('Камера успешно включена');
+                alert('Камера включена');
+
+                await loadModels();
+
+                video.addEventListener('play', () => {
+                    setInterval(async () => {
+                        try {
+                            const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
+                            if (detections.length > 0) {
+                                const emotions = detections[0].expressions;
+                                const emotion = Object.keys(emotions).reduce((a, b) => emotions[a] > emotions[b] ? a : b);
+                                document.getElementById('emotion').textContent = emotion;
+                                const fatigueLevel = Math.round((1 - emotions['neutral']) * 100);
+                                document.getElementById('fatigueLevel').style.width = `${fatigueLevel}%`;
+                                document.getElementById('fatigueText').textContent = `Уровень усталости: ${fatigueLevel}%`;
+                            } else {
+                                document.getElementById('emotion').textContent = '-';
+                                document.getElementById('fatigueLevel').style.width = '0%';
+                                document.getElementById('fatigueText').textContent = 'Лицо не обнаружено';
+                            }
+                        } catch (err) {
+                            console.error('Ошибка анализа лица:', err);
+                            alert('Ошибка анализа лица');
+                        }
+                    }, 1000);
+                });
+            } catch (err) {
+                console.error('Ошибка доступа к камере:', err);
+                alert('Не удалось получить доступ к камере');
+            }
+        });
+    </script>
+</body>
+</html>
